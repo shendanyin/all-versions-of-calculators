@@ -1,0 +1,112 @@
+import math
+import os
+import re
+
+# Dictionary for allowed functions and constants
+allowed_entities = {'abs': abs, 'sin': math.sin, 'cos': math.cos, 'sqrt': math.sqrt, 'pi': math.pi}
+
+# Load custom functions from the specified directory
+custom_functions_dir = "D:\\owncodes"
+for filename in os.listdir(custom_functions_dir):
+    if filename.endswith(".yzn"):
+        with open(os.path.join(custom_functions_dir, filename), 'r') as file:
+            function_body = file.read().replace('@', 'x')
+            function_name = filename[:-4]
+            exec(f'def {function_name}(x): return {function_body}')
+            allowed_entities[function_name] = locals()[function_name]
+
+def evaluate_expression(expression):
+    def apply_operator(operators, values):
+        operator = operators.pop()
+        right = values.pop()
+        left = values.pop()
+        if operator == '+':
+            values.append(left + right)
+        elif operator == '-':
+            values.append(left - right)
+        elif operator == '*':
+            values.append(left * right)
+        elif operator == '/':
+            values.append(left / right)
+        elif operator == '%':
+            values.append(left % right)
+        elif operator == '//':
+            values.append(left // right)
+
+    def greater_precedence(op1, op2):
+        precedence = {'+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '//': 2}
+        return precedence[op1] > precedence[op2]
+
+    def parse_expression_tokens(expression):
+        tokens = []
+        current_token = ''
+        for char in expression:
+            if char.isalnum() or char == '.':
+                current_token += char
+            elif current_token:
+                tokens.append(current_token)
+                current_token = ''
+            if char in "+-*/%()":
+                tokens.append(char)
+        if current_token:
+            tokens.append(current_token)
+        return tokens
+
+    def process_tokens(tokens):
+        operators = []
+        values = []
+        for token in tokens:
+            if token.isnumeric() or token.replace('.', '').isdigit():
+                values.append(float(token))
+            elif token in allowed_entities:
+                values.append(allowed_entities[token])
+            elif token == '(':
+                operators.append(token)
+            elif token == ')':
+                while operators and operators[-1] != '(':
+                    apply_operator(operators, values)
+                operators.pop()  # Discard the '('
+            elif token in "+-*/%":
+                while (operators and operators[-1] in "+-*/%" and
+                       greater_precedence(operators[-1], token)):
+                    apply_operator(operators, values)
+                operators.append(token)
+        while operators:
+            apply_operator(operators, values)
+        return values[0]
+
+    tokens = parse_expression_tokens(expression)
+    result = process_tokens(tokens)
+    return result
+
+expressions = ["1+2+3+4", "1+(2+3)*5/(7.8-2)", "1+sin(2)/(cos(2)+1)", "sin(2)+OWN(2)"]
+for expr in expressions:
+    try:
+        result = evaluate_expression(expr)
+        print(f"{expr} = {result}")
+    except Exception as e:
+        print(f"Error evaluating expression '{expr}': {str(e)}")
+import tkinter as tk
+
+class App:
+    def __init__(self, master):
+        self.master = master
+        master.title("Calculator")
+
+        self.entry = tk.Entry(master)
+        self.entry.grid(row=0, column=0, columnspan=4)
+
+        self.calculate_button = tk.Button(master, text="Calculate", command=self.calculate)
+        self.calculate_button.grid(row=1, column=0, columnspan=4)
+
+    def calculate(self):
+        expression = self.entry.get()
+        try:
+            result = evaluate_expression(expression)
+            print(f"{expression} = {result}")
+        except Exception as e:
+            print(f"Error evaluating expression '{expression}': {str(e)}")
+
+root = tk.Tk()
+app = App(root)
+root.mainloop()
